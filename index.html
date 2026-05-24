@@ -815,7 +815,7 @@
                 type: type,
                 description: description,
                 amount: parseFloat(amount)
-            });
+});
             saveState();
         }
 
@@ -881,6 +881,7 @@
             let totalCardsBill = 0;
             let totalPrepaid = 0;
             let totalWeeklyFaturas = 0;
+            let totalAbertoLiquido = 0; // Nova variável para somar o que realmente falta pagar
 
             const processedCards = state.cards.map(c => {
                 const prepaidAmount = parseFloat(c.prepaid || 0);
@@ -889,6 +890,7 @@
 
                 let myShare = c.totalBill - prepaidAmount;
                 if (myShare < 0) myShare = 0;
+                totalAbertoLiquido += myShare; // Soma o valor em aberto
                 
                 const computedDueDate = getNextDueDate(c.dueDay, today);
                 const diffTime = computedDueDate - today;
@@ -953,10 +955,13 @@
             const marginAddition = baseWeeklyMeta * state.safetyMargin;
             const totalWeeklyMetaWithMargin = baseWeeklyMeta + marginAddition;
 
-            // 🛡️ CORREÇÃO LOGICA DO VALOR NEGATIVO (O Saldo Livre Estimado só abate despesas se as receitas forem maiores que R$ 0,00)
+            // 🛡️ CORREÇÃO LÓGICA DO VALOR NEGATIVO DEFINITIVO
+            // Se as receitas forem R$ 0,00 ou inferiores às faturas em aberto reais do mês, o saldo livre não pode ficar negativo de forma enganadora.
             let estimatedFreeMonthlySalary = 0;
             if (totalMonthlyIncome > 0) {
-                estimatedFreeMonthlySalary = totalMonthlyIncome - totalCardsBill - (state.dailyTeto * 4.33);
+                // Saldo livre = Renda total - Apenas o que realmente falta pagar dos cartões (descontados os adiantados) - Gastos de Caixa reais já feitos (e não o teto projetado abstrato)
+                estimatedFreeMonthlySalary = totalMonthlyIncome - totalAbertoLiquido - currentWeekDailyTotal;
+                if (estimatedFreeMonthlySalary < 0) estimatedFreeMonthlySalary = 0;
             }
 
             const incomeCommitmentPercent = weeklyIncome > 0 ? Math.min(100, Math.round((totalWeeklyMetaWithMargin / weeklyIncome) * 100)) : 0;
