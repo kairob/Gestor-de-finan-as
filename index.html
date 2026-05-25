@@ -565,7 +565,7 @@
             border-top: 1px solid var(--border-color);
             padding: 8px 4px 12px 4px;
             display: flex;
-            justify-content: space-between;
+            justify-content: space-around;
             align-items: center;
             z-index: 40;
             gap: 1px;
@@ -815,7 +815,7 @@
                 type: type,
                 description: description,
                 amount: parseFloat(amount)
-});
+            });
             saveState();
         }
 
@@ -873,15 +873,41 @@
         function runCalculations() {
             const today = new Date(simulatedTodayStr + 'T00:00:00');
 
-            // 1. Receitas Totais do Mês
-            const totalMonthlyIncome = state.incomes.reduce((sum, i) => sum + parseFloat(i.value || 0), 0);
-            const weeklyIncome = totalMonthlyIncome / 4.33;
+            // 1. Receitas Totais e Projeção Regressiva do Próximo Salário
+            let totalMonthlyIncome = 0;
+            let totalWeeklyIncome = 0;
+
+            const processedIncomes = state.incomes.map(i => {
+                const value = parseFloat(i.value || 0);
+                const dueDay = parseInt(i.dueDay || 1);
+                totalMonthlyIncome += value;
+
+                // Calcula semanas reais que faltam até o próximo salário cair na conta
+                const nextPayDate = getNextDueDate(dueDay, today);
+                const diffTime = nextPayDate - today;
+                let diffDays = diffTime / (1000 * 60 * 60 * 24);
+                let calculatedWeeks = diffDays / 7;
+                if (calculatedWeeks < 1.0) calculatedWeeks = 1.0;
+
+                // Receita semanalizada com base na contagem regressiva viva
+                const calculatedWeeklyPart = value / calculatedWeeks;
+                totalWeeklyIncome += calculatedWeeklyPart;
+
+                return {
+                    ...i,
+                    value,
+                    dueDay,
+                    nextPayDate,
+                    calculatedWeeks,
+                    weeklyPart: calculatedWeeklyPart
+                };
+            });
 
             // 2. Faturas dos Cartões e Adiantamentos (Sem Partilhas/Devedores)
             let totalCardsBill = 0;
             let totalPrepaid = 0;
             let totalWeeklyFaturas = 0;
-            let totalAbertoLiquido = 0; // Nova variável para somar o que realmente falta pagar
+            let totalAbertoLiquido = 0;
 
             const processedCards = state.cards.map(c => {
                 const prepaidAmount = parseFloat(c.prepaid || 0);
@@ -890,7 +916,7 @@
 
                 let myShare = c.totalBill - prepaidAmount;
                 if (myShare < 0) myShare = 0;
-                totalAbertoLiquido += myShare; // Soma o valor em aberto
+                totalAbertoLiquido += myShare;
                 
                 const computedDueDate = getNextDueDate(c.dueDay, today);
                 const diffTime = computedDueDate - today;
@@ -955,26 +981,30 @@
             const marginAddition = baseWeeklyMeta * state.safetyMargin;
             const totalWeeklyMetaWithMargin = baseWeeklyMeta + marginAddition;
 
-            // 🛡️ CORREÇÃO LÓGICA DO VALOR NEGATIVO DEFINITIVO
-            // Se as receitas forem R$ 0,00 ou inferiores às faturas em aberto reais do mês, o saldo livre não pode ficar negativo de forma enganadora.
+            // 🛡️ CORREÇÃO DEFINITIVA DO SALDO NEGATIVO (Nova Regra de Fluxo Regressivo Real)
             let estimatedFreeMonthlySalary = 0;
             if (totalMonthlyIncome > 0) {
-                // Saldo livre = Renda total - Apenas o que realmente falta pagar dos cartões (descontados os adiantados) - Gastos de Caixa reais já feitos (e não o teto projetado abstrato)
+                // Seu Saldo Livre é: Tudo o que você ganha de renda - o que resta pagar das faturas - seus gastos reais de rua já computados.
                 estimatedFreeMonthlySalary = totalMonthlyIncome - totalAbertoLiquido - currentWeekDailyTotal;
-                if (estimatedFreeMonthlySalary < 0) estimatedFreeMonthlySalary = 0;
+                // Proteção matemática: Se a renda mensal não cobrir a fatura atual líquida, o app mostra R$ 0,00 amigável em vez de valores negativos.
+                if (estimatedFreeMonthlySalary < 0) {
+                    estimatedFreeMonthlySalary = 0;
+                }
             }
 
-            const incomeCommitmentPercent = weeklyIncome > 0 ? Math.min(100, Math.round((totalWeeklyMetaWithMargin / weeklyIncome) * 100)) : 0;
+            // O comprometimento agora é calculado de forma dinâmica comparando sua meta com o Ganho Semanal Regressivo Real!
+            const incomeCommitmentPercent = totalWeeklyIncome > 0 ? Math.min(100, Math.round((totalWeeklyMetaWithMargin / totalWeeklyIncome) * 100)) : 0;
 
             return {
                 processedCards,
                 processedSavings,
+                processedIncomes,
                 baseWeeklyMeta,
                 marginAddition,
                 totalWeeklyMeta: totalWeeklyMetaWithMargin,
                 totalPrepaid,
                 totalMonthlyIncome,
-                weeklyIncome,
+                totalWeeklyIncome,
                 estimatedFreeMonthlySalary,
                 incomeCommitmentPercent,
                 currentWeekDailyTotal,
@@ -1227,6 +1257,7 @@
             `;
         }
 
+        // NOVO: ABA GANHOS EXIBE O DIA DO PRÓXIMO SALÁRIO E PRAZO RESTANTE
         function renderReceitas(container, data) {
             container.innerHTML = `
                 <div class="list-container">
@@ -1234,26 +1265,32 @@
                         <div class="item-card" style="text-align: center; padding: 24px; color: var(--text-muted); border: 1px dashed var(--border-color);">
                             Nenhum ganho cadastrado. Clique no botão "+" abaixo para cadastrar o seu salário ou fontes de renda adicionais!
                         </div>
-                    ` : state.incomes.map(i => `
-                        <div class="item-card" style="border-color: rgba(16, 185, 129, 0.4);">
-                            <div class="item-card-header">
-                                <div>
-                                    <h3 class="item-title" style="color: var(--primary);">${i.name}</h3>
-                                    <span class="item-subtitle">Fonte de Ganho / Receita</span>
+                    ` : data.processedIncomes.map(i => {
+                        let formattedWeeks = i.calculatedWeeks % 1 === 0 ? i.calculatedWeeks.toFixed(0) : i.calculatedWeeks.toFixed(1);
+                        return `
+                            <div class="item-card" style="border-color: rgba(16, 185, 129, 0.4);">
+                                <div class="item-card-header">
+                                    <div>
+                                        <h3 class="item-title" style="color: var(--primary);">${i.name}</h3>
+                                        <span class="item-subtitle">Recebimento: Dia ${i.dueDay} (Faltam ${formattedWeeks} sem)</span>
+                                    </div>
+                                    <div class="item-value-side">
+                                        <span class="item-value-label">Valor</span>
+                                        <span class="item-value-main" style="color: var(--primary);">${formatBRL(i.value)}</span>
+                                    </div>
                                 </div>
-                                <div class="item-value-side">
-                                    <span class="item-value-label">Valor</span>
-                                    <span class="item-value-main" style="color: var(--primary);">${formatBRL(i.value)}</span>
+                                <div class="info-grid">
+                                    <div class="info-row"><span>Rendimento Semanal Proporcional:</span><span style="color: var(--primary);">${formatBRL(i.weeklyPart)}</span></div>
+                                </div>
+                                <div class="card-actions" style="justify-content: flex-end;">
+                                    <div class="action-button-group">
+                                        <button onclick="editIncome('${i.id}')" class="btn-action edit">Editar</button>
+                                        <button onclick="deleteIncome('${i.id}')" class="btn-action delete">Remover</button>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="card-actions" style="justify-content: flex-end;">
-                                <div class="action-button-group">
-                                    <button onclick="editIncome('${i.id}')" class="btn-action edit">Editar</button>
-                                    <button onclick="deleteIncome('${i.id}')" class="btn-action delete">Remover</button>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             `;
         }
@@ -1370,9 +1407,9 @@
                 const incomesHeader = [
                     ["FONTES DE RENDAS E GANHOS"],
                     [],
-                    ["Renda / Ganho", "Valor Estimado Mensal (R$)"]
+                    ["Renda / Ganho", "Valor Mensal (R$)", "Dia Recebimento"]
                 ];
-                state.incomes.forEach(i => { incomesHeader.push([i.name, parseFloat(i.value)]); });
+                state.incomes.forEach(i => { incomesHeader.push([i.name, parseFloat(i.value), i.dueDay]); });
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(incomesHeader), "Rendas & Ganhos");
 
                 // 4. Livro Diário
@@ -1429,7 +1466,10 @@
             } else if (type === 'receita') {
                 fields.innerHTML = `
                     <div class="form-group"><label class="form-label">Nome da Receita</label><input type="text" id="i-name" required class="form-control" placeholder="Ex: Salário Fixo"></div>
-                    <div class="form-group"><label class="form-label">Valor Mensal (R$)</label><input type="number" step="0.01" id="i-value" required class="form-control" placeholder="0.00"></div>`;
+                    <div class="form-grid-2">
+                        <div class="form-group"><label class="form-label">Valor Mensal (R$)</label><input type="number" step="0.01" id="i-value" required class="form-control" placeholder="0.00"></div>
+                        <div class="form-group"><label class="form-label">Dia do Recebimento (1-31)</label><input type="number" min="1" max="31" id="i-day" required class="form-control" placeholder="Ex: 5"></div>
+                    </div>`;
             } else if (type === 'diario') {
                 fields.innerHTML = `
                     <div class="form-group"><label class="form-label">Descrição do Gasto</label><input type="text" id="d-name" required class="form-control" placeholder="Ex: Uber ou Lanche"></div>
@@ -1474,14 +1514,15 @@
             } else if (type === 'receita') {
                 const name = document.getElementById('i-name').value.toUpperCase();
                 const value = parseFloat(document.getElementById('i-value').value);
+                const dueDay = parseInt(document.getElementById('i-day').value) || 1;
 
                 if (state.editingId) {
                     const idx = state.incomes.findIndex(i => i.id === state.editingId);
-                    state.incomes[idx] = { id: state.editingId, name, value };
-                    logToJournal('edicao', `Ganho ${name} alterado para ${formatBRL(value)}.`, value);
+                    state.incomes[idx] = { id: state.editingId, name, value, dueDay };
+                    logToJournal('edicao', `Ganho ${name} alterado para ${formatBRL(value)}, Recebimento Dia ${dueDay}.`, value);
                 } else {
-                    state.incomes.push({ id: Date.now().toString(), name, value });
-                    logToJournal('criacao', `Nova receita cadastrada: ${name} de ${formatBRL(value)}.`, value);
+                    state.incomes.push({ id: Date.now().toString(), name, value, dueDay });
+                    logToJournal('criacao', `Nova receita cadastrada: ${name} de ${formatBRL(value)}, Recebimento Dia ${dueDay}.`, value);
                 }
                 switchTab('receitas');
             } else if (type === 'diario') {
@@ -1558,6 +1599,7 @@
             openAddModal(); state.editingId = id; setModalType('receita');
             document.getElementById('i-name').value = i.name;
             document.getElementById('i-value').value = i.value;
+            document.getElementById('i-day').value = i.dueDay || 5;
         }
 
         window.deleteIncome = function(id) {
