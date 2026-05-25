@@ -857,7 +857,7 @@
             showToast(`Teto semanal diário ajustado!`);
         };
 
-        // --- CALCULA A DATA DE VENCIMENTO DO PRÓXIMO CICLO COM ROLLOVER INTELIGENTE ---
+        // --- CALCULA A DATA DE VENCIMENTO DO PRÓXIMO CICLO COM ROLLOVER INTELIGENTE (Para Cartões) ---
         function getNextDueDate(dueDay, today) {
             let year = today.getFullYear();
             let month = today.getMonth();
@@ -870,10 +870,22 @@
             return candidate;
         }
 
+        // --- CALCULA A DATA DE RECEBIMENTO DO SALÁRIO SEM ROLLOVER PREMATURO (Para Ganhos) ---
+        function getNextPayDate(payDay, today) {
+            let year = today.getFullYear();
+            let month = today.getMonth();
+            let candidate = new Date(year, month, payDay, 0, 0, 0);
+            // Só faz o rollover para o mês seguinte após o dia do pagamento de fato passar
+            if (candidate < today) {
+                candidate = new Date(year, month + 1, payDay, 0, 0, 0);
+            }
+            return candidate;
+        }
+
         function runCalculations() {
             const today = new Date(simulatedTodayStr + 'T00:00:00');
 
-            // 1. Receitas Totais e Projeção Regressiva do Próximo Salário
+            // 1. Receitas Totais e Projeção Regressiva do Próximo Salário com Travas de Segurança
             let totalMonthlyIncome = 0;
             let totalWeeklyIncome = 0;
 
@@ -882,14 +894,18 @@
                 const dueDay = parseInt(i.dueDay || 1);
                 totalMonthlyIncome += value;
 
-                // Calcula semanas reais que faltam até o próximo salário cair na conta
-                const nextPayDate = getNextDueDate(dueDay, today);
+                // Calcula semanas reais que faltam até o próximo salário cair na conta (sem o rollover antecipado)
+                const nextPayDate = getNextPayDate(dueDay, today);
                 const diffTime = nextPayDate - today;
                 let diffDays = diffTime / (1000 * 60 * 60 * 24);
                 let calculatedWeeks = diffDays / 7;
-                if (calculatedWeeks < 1.0) calculatedWeeks = 1.0;
+                
+                // Trava de segurança: impede que a semana seja menor que 1.0 para o valor do ganho semanal não dobrar/inflacionar
+                if (calculatedWeeks < 1.0) {
+                    calculatedWeeks = 1.0;
+                }
 
-                // Receita semanalizada com base na contagem regressiva viva
+                // Receita semanalizada perfeitamente calibrada (será no máximo o salário cheio)
                 const calculatedWeeklyPart = value / calculatedWeeks;
                 totalWeeklyIncome += calculatedWeeklyPart;
 
@@ -1090,11 +1106,11 @@
 
                         <div class="info-grid-3" style="background: transparent; padding: 8px 0 0 0; gap: 4px; width: 100%;">
                             <div class="info-cell">
-                                <span class="info-grid-label" style="font-size: 7px;">Teto Semanal</span>
+                                <span class="info-grid-label">Teto Semanal</span>
                                 <span class="info-grid-value" style="color: #cbd5e1; font-size: 10px;">${formatBRL(state.dailyTeto)}</span>
                             </div>
                             <div class="info-cell">
-                                <span class="info-grid-label" style="font-size: 7px;">Gasto na Semana</span>
+                                <span class="info-grid-label">Gasto na Semana</span>
                                 <span class="info-grid-value" style="color: var(--accent-rose); font-size: 10px;">${formatBRL(data.currentWeekDailyTotal)}</span>
                             </div>
                             <div class="info-cell">
@@ -1117,7 +1133,7 @@
                     <!-- 5. RESUMO GERAL DAS CONTAS -->
                     <div class="summary-grid" style="grid-template-cols: 1fr 1fr; gap: 8px;">
                         <div class="summary-card" style="padding: 10px 6px;">
-                            <span class="summary-label" style="font-size: 8px;">Faturas Totais</span>
+                            <span class="summary-label">Faturas Totais</span>
                             <span class="summary-value" style="font-size: 13px;">${formatBRL(totalFaturasTotal)}</span>
                         </div>
                         <div class="summary-card" style="padding: 10px 6px; background-color: rgba(20, 184, 166, 0.05);">
