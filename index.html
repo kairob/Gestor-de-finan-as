@@ -819,7 +819,6 @@
             saveState();
         }
 
-        // Conversão de moeda formatada BRL
         function formatBRL(val) {
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
         }
@@ -998,17 +997,12 @@
             const currentWeekDailyTotal = state.dailyExpenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
             const remainingDailyTeto = Math.max(0, state.dailyTeto - currentWeekDailyTotal);
 
-            // 6. Consolidação Geral com Abatimento do Salário Semanal Ativo
+            // 6. Consolidação Geral Sem Abatimento Deformador de Renda
+            // 🛡️ CORREÇÃO REAL: A Meta Semanal Geral representa a poupança real bruta necessária
+            // Ela não deve ser reduzida pela renda! A renda serve para pagar a meta, o que se mostra no Comprometimento e Saldo Livre.
             const baseWeeklyMetaExpenses = totalWeeklyFaturas + totalWeeklySavingsGoal;
-            
-            // 🛡️ NOVO: Abate o rendimento semanal proporcional da meta de despesas da semana!
-            let netWeeklyMeta = baseWeeklyMetaExpenses - totalWeeklyIncome;
-            if (netWeeklyMeta < 0) {
-                netWeeklyMeta = 0; // Se a renda cobre tudo, a meta é R$ 0,00
-            }
-
-            const marginAddition = netWeeklyMeta * state.safetyMargin;
-            const totalWeeklyMetaWithMargin = netWeeklyMeta + marginAddition;
+            const marginAddition = baseWeeklyMetaExpenses * state.safetyMargin;
+            const totalWeeklyMetaWithMargin = baseWeeklyMetaExpenses + marginAddition;
 
             // 🛡️ CORREÇÃO DEFINITIVA DO SALDO NEGATIVO (Nova Regra de Fluxo Regressivo Real)
             let estimatedFreeMonthlySalary = 0;
@@ -1088,7 +1082,7 @@
                     <div class="meta-card">
                         <span class="meta-card-label">Sua Meta Semanal Geral</span>
                         <h2 class="meta-card-value">${formatBRL(data.totalWeeklyMeta)}</h2>
-                        <p class="meta-card-desc">Líquido de Faturas e Objetivos de Poupança - Salário Proporcional Ativo</p>
+                        <p class="meta-card-desc">Faturas + Objetivos de Poupança + Margem (+${marginPercent}%)</p>
                     </div>
 
                     <!-- 2. BALANÇO DE RECEITA E COMPROMETIMENTO -->
@@ -1445,7 +1439,7 @@
                 const journalHeader = [
                     ["LIVRO DIÁRIO - REGISTRO DE TRANSAÇÕES"],
                     [],
-                    ["Data/Hora", "Ação", "Descrição do Evento", "Valor Associated (R$)"]
+                    ["Data/Hora", "Ação", "Descrição do Evento", "Valor Associado (R$)"]
                 ];
                 state.history.forEach(h => { journalHeader.push([h.date, h.type.toUpperCase(), h.description, h.amount]); });
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(journalHeader), "Livro Diário");
