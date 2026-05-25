@@ -819,6 +819,7 @@
             saveState();
         }
 
+        // Conversão de moeda formatada BRL
         function formatBRL(val) {
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
         }
@@ -857,25 +858,26 @@
             showToast(`Teto semanal diário ajustado!`);
         };
 
-        // --- CALCULA A DATA DE VENCIMENTO DO PRÓXIMO CICLO COM ROLLOVER INTELIGENTE (Para Cartões) ---
+        // --- CALCULA A DATA DE VENCIMENTO COM ROLLOVER SEGURO DE 7 DIAS ---
         function getNextDueDate(dueDay, today) {
             let year = today.getFullYear();
             let month = today.getMonth();
             let candidate = new Date(year, month, dueDay, 0, 0, 0);
             const diffTime = candidate - today;
             const diffDays = diffTime / (1000 * 60 * 60 * 24);
+            
+            // 💡 Se o vencimento do cartão for em menos de 7 dias, assumimos que já foi pago ou provisionado no ciclo anterior, jogando o planejamento dinâmico para o mês seguinte.
             if (candidate < today || diffDays < 7) {
                 candidate = new Date(year, month + 1, dueDay, 0, 0, 0);
             }
             return candidate;
         }
 
-        // --- CALCULA A DATA DE RECEBIMENTO DO SALÁRIO SEM ROLLOVER PREMATURO (Para Ganhos) ---
+        // --- CALCULA A DATA DE RECEBIMENTO DO SALÁRIO SEM ROLLOVER PREMATURO ---
         function getNextPayDate(payDay, today) {
             let year = today.getFullYear();
             let month = today.getMonth();
             let candidate = new Date(year, month, payDay, 0, 0, 0);
-            // Só faz o rollover para o mês seguinte após o dia do pagamento de fato passar
             if (candidate < today) {
                 candidate = new Date(year, month + 1, payDay, 0, 0, 0);
             }
@@ -938,7 +940,11 @@
                 const diffTime = computedDueDate - today;
                 let diffDays = diffTime / (1000 * 60 * 60 * 24);
                 let calculatedWeeks = diffDays / 7;
-                if (calculatedWeeks < 1.0) calculatedWeeks = 1.0;
+                
+                // Trava de segurança contra metas gigantescas perto do vencimento: teto mínimo de 1.0 semana restante
+                if (calculatedWeeks < 1.0) {
+                    calculatedWeeks = 1.0;
+                }
 
                 const weeklyContribution = myShare / calculatedWeeks;
                 totalWeeklyFaturas += weeklyContribution;
@@ -1090,7 +1096,7 @@
                         </div>
                     </div>
 
-                    <!-- 3. CONTROLE DE CAIXA DE GASTOS DIÁRIOS FLUTUANTES (Opção 3) -->
+                    <!-- 3. CONTROLE DE CAIXA DE GASTOS DIÁRIOS FLUTUANTES -->
                     <div class="item-card" style="border-color: rgba(20, 184, 166, 0.4); background: linear-gradient(135deg, var(--bg-card), rgba(2, 6, 23, 0.6));">
                         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(51, 65, 85, 0.4); padding-bottom: 8px; flex-wrap: wrap; gap: 8px; width: 100%;">
                             <span class="margin-controller-label" style="color: var(--secondary); white-space: normal;">Controle de Gastos Diários</span>
