@@ -819,7 +819,6 @@
             saveState();
         }
 
-        // Conversão de moeda formatada BRL
         function formatBRL(val) {
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
         }
@@ -902,7 +901,7 @@
                 let diffDays = diffTime / (1000 * 60 * 60 * 24);
                 let calculatedWeeks = diffDays / 7;
                 
-                // Trava de segurança: impede que a semana seja menor que 1.0 para o ganho semanal não dobrar
+                // 🛡️ Lógica: Se o salário está a menos de 7 dias do recebimento, o divisor trava em 1.0 para manter o valor inteiro na última semana.
                 if (calculatedWeeks < 1.0 || diffDays <= 7) {
                     calculatedWeeks = 1.0;
                 }
@@ -999,12 +998,12 @@
             const remainingDailyTeto = Math.max(0, state.dailyTeto - currentWeekDailyTotal);
 
             // 6. Consolidação Geral Sem Abatimento Deformador de Renda no topo do painel
-            // O valor da meta semanal deve representar de forma limpa o seu esforço bruto real necessário
+            // O valor da meta semanal deve representar de forma limpa o seu esforço bruto real necessário de retenção
             const baseWeeklyMetaExpenses = totalWeeklyFaturas + totalWeeklySavingsGoal;
             const marginAddition = baseWeeklyMetaExpenses * state.safetyMargin;
             const totalWeeklyMetaWithMargin = baseWeeklyMetaExpenses + marginAddition;
 
-            // CORREÇÃO DEFINITIVA DO SALDO NEGATIVO (Nova Regra de Fluxo Regressivo Real)
+            // 🛡️ CORREÇÃO DEFINITIVA DO SALDO NEGATIVO (Nova Regra de Fluxo Regressivo Real)
             let estimatedFreeMonthlySalary = 0;
             if (totalMonthlyIncome > 0) {
                 // Seu Saldo Livre é: Tudo o que você ganha de renda - o que resta pagar das faturas - seus gastos reais de rua já computados.
@@ -1411,7 +1410,8 @@
                         c.name, c.totalBill, c.dueDay, c.computedDueDate.toLocaleDateString('pt-BR'), c.prepaidAmount, c.myShare, parseFloat(c.weeklyTarget.toFixed(2))
                     ]);
                 });
-                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryHeader), "Resumo & Cartões");
+                Xcontent = XLSX.utils.aoa_to_sheet(summaryHeader);
+                XLSX.utils.book_append_sheet(wb, xcontent, "Resumo & Cartões");
 
                 // 2. Objetivos de Poupança
                 const savingsHeader = [
