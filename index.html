@@ -762,7 +762,7 @@
 
     <!-- SCRIPT FINANÇAS LOCAIS -->
     <script>
-        // 🛡️ LISTAS INICIAIS VAZIAS PARA PRIVACIDADE NO GITHUB PÚBLICO
+        // 🛡— LISTAS INICIAIS VAZIAS PARA PRIVACIDADE NO GITHUB PÚBLICO
         const initialCards = [];
         const initialSavings = [];
         const initialIncomes = [];
@@ -866,7 +866,7 @@
             const diffTime = candidate - today;
             const diffDays = diffTime / (1000 * 60 * 60 * 24);
             
-            // 🛡️ Se o vencimento do cartão for em menos de 7 dias (ou se já venceu), joga o ciclo de economia para o próximo mês automaticamente.
+            // 🛡— Se o vencimento do cartão for em menos de 7 dias (ou se já venceu), joga o ciclo de economia para o próximo mês automaticamente.
             if (candidate < today || diffDays <= 7) {
                 candidate = new Date(year, month + 1, dueDay, 0, 0, 0);
             }
@@ -902,7 +902,7 @@
                 let diffDays = diffTime / (1000 * 60 * 60 * 24);
                 let calculatedWeeks = diffDays / 7;
                 
-                // 🛡️ Lógica solicitada: Se o salário está a menos de 7 dias do recebimento, o divisor trava em 1.0 para manter o valor inteiro na última semana.
+                // 🛡— Lógica solicitada: Se o salário está a menos de 7 dias do recebimento, o divisor trava em 1.0 para manter o valor inteiro na última semana.
                 if (calculatedWeeks < 1.0 || diffDays <= 7) {
                     calculatedWeeks = 1.0;
                 }
@@ -998,21 +998,13 @@
             const currentWeekDailyTotal = state.dailyExpenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
             const remainingDailyTeto = Math.max(0, state.dailyTeto - currentWeekDailyTotal);
 
-            // 6. Consolidação Geral Sem Abatimento Deformador de Renda
-            // 🛡️ CORREÇÃO REAL: A Meta Semanal Geral representa a poupança real bruta necessária
-            // Ela não deve ser reduzida pela renda! A renda serve para pagar a meta, o que se mostra no Comprometimento e Saldo Livre.
+            // 6. Consolidação Geral Sem Abatimento Deformador de Renda no topo do painel
+            // O valor da meta semanal deve representar de forma limpa o seu esforço bruto real necessário
             const baseWeeklyMetaExpenses = totalWeeklyFaturas + totalWeeklySavingsGoal;
-            
-            // 🛡️ Subtraímos o rendimento semanal para aplicar o abatimento real e exato na Meta Semanal!
-            let netWeeklyMeta = baseWeeklyMetaExpenses - totalWeeklyIncome;
-            if (netWeeklyMeta < 0) {
-                netWeeklyMeta = 0; // Se o salário semanal cobre tudo, a meta fica zerada
-            }
+            const marginAddition = baseWeeklyMetaExpenses * state.safetyMargin;
+            const totalWeeklyMetaWithMargin = baseWeeklyMetaExpenses + marginAddition;
 
-            const marginAddition = netWeeklyMeta * state.safetyMargin;
-            const totalWeeklyMetaWithMargin = netWeeklyMeta + marginAddition;
-
-            // 🛡️ CORREÇÃO DEFINITIVA DO SALDO NEGATIVO (Nova Regra de Fluxo Regressivo Real)
+            // 🛡— CORREÇÃO DEFINITIVA DO SALDO NEGATIVO (Nova Regra de Fluxo Regressivo Real)
             let estimatedFreeMonthlySalary = 0;
             if (totalMonthlyIncome > 0) {
                 // Seu Saldo Livre é: Tudo o que você ganha de renda - o que resta pagar das faturas - seus gastos reais de rua já computados.
@@ -1090,7 +1082,7 @@
                     <div class="meta-card">
                         <span class="meta-card-label">Sua Meta Semanal Geral</span>
                         <h2 class="meta-card-value">${formatBRL(data.totalWeeklyMeta)}</h2>
-                        <p class="meta-card-desc">Faturas + Objetivos de Poupança - Salário Proporcional Ativo + Margem (+${marginPercent}%)</p>
+                        <p class="meta-card-desc">Faturas + Objetivos de Poupança + Margem (+${marginPercent}%)</p>
                     </div>
 
                     <!-- 2. BALANÇO DE RECEITA E COMPROMETIMENTO -->
@@ -1441,7 +1433,7 @@
                     ["Renda / Ganho", "Valor Mensal (R$)", "Dia Recebimento"]
                 ];
                 state.incomes.forEach(i => { incomesHeader.push([i.name, parseFloat(i.value), i.dueDay]); });
-                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(icomesHeader), "Rendas & Ganhos");
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(incomesHeader), "Rendas & Ganhos");
 
                 // 4. Livro Diário
                 const journalHeader = [
