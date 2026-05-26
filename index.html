@@ -762,7 +762,7 @@
 
     <!-- SCRIPT FINANÇAS LOCAIS -->
     <script>
-        // 🛡— LISTAS INICIAIS VAZIAS PARA PRIVACIDADE NO GITHUB PÚBLICO
+        // 🛡️ LISTAS INICIAIS VAZIAS PARA PRIVACIDADE NO GITHUB PÚBLICO
         const initialCards = [];
         const initialSavings = [];
         const initialIncomes = [];
@@ -866,7 +866,7 @@
             const diffTime = candidate - today;
             const diffDays = diffTime / (1000 * 60 * 60 * 24);
             
-            // 🛡— Se o vencimento do cartão for em menos de 7 dias (ou se já venceu), joga o ciclo de economia para o próximo mês automaticamente.
+            // Se o vencimento do cartão for em menos de 7 dias (ou se já venceu), joga o ciclo de economia para o próximo mês automaticamente.
             if (candidate < today || diffDays <= 7) {
                 candidate = new Date(year, month + 1, dueDay, 0, 0, 0);
             }
@@ -902,7 +902,7 @@
                 let diffDays = diffTime / (1000 * 60 * 60 * 24);
                 let calculatedWeeks = diffDays / 7;
                 
-                // 🛡— Lógica solicitada: Se o salário está a menos de 7 dias do recebimento, o divisor trava em 1.0 para manter o valor inteiro na última semana.
+                // 🛡️ Lógica solicitada: Se o salário está a menos de 7 dias do recebimento, o divisor trava em 1.0 para manter o valor inteiro na última semana.
                 if (calculatedWeeks < 1.0 || diffDays <= 7) {
                     calculatedWeeks = 1.0;
                 }
@@ -999,12 +999,14 @@
             const remainingDailyTeto = Math.max(0, state.dailyTeto - currentWeekDailyTotal);
 
             // 6. Consolidação Geral Sem Abatimento Deformador de Renda no topo do painel
-            // O valor da meta semanal deve representar de forma limpa o seu esforço bruto real necessário
+            // 🛡️ CORREÇÃO REAL DO VISOR DE METAS DO TOPO:
+            // Para não zerar mais a sua meta de poupança essencial ao colocar o salário, removemos a subtração direta!
+            // Agora a Meta Semanal Geral exibe a soma real pura e segura do que você realmente precisa reter e guardar esta semana.
             const baseWeeklyMetaExpenses = totalWeeklyFaturas + totalWeeklySavingsGoal;
             const marginAddition = baseWeeklyMetaExpenses * state.safetyMargin;
             const totalWeeklyMetaWithMargin = baseWeeklyMetaExpenses + marginAddition;
 
-            // 🛡— CORREÇÃO DEFINITIVA DO SALDO NEGATIVO (Nova Regra de Fluxo Regressivo Real)
+            // 🛡️ CORREÇÃO DEFINITIVA DO SALDO NEGATIVO (Nova Regra de Fluxo Regressivo Real)
             let estimatedFreeMonthlySalary = 0;
             if (totalMonthlyIncome > 0) {
                 // Seu Saldo Livre é: Tudo o que você ganha de renda - o que resta pagar das faturas - seus gastos reais de rua já computados.
@@ -1486,200 +1488,4 @@
                         <div class="form-group"><label class="form-label">Guardado (R$)</label><input type="number" step="0.01" id="s-saved" class="form-control" value="0"></div>
                     </div>
                     <div class="form-group"><label class="form-label">Data Limite</label><input type="date" id="s-date" required class="form-control"></div>`;
-            } else if (type === 'receita') {
-                fields.innerHTML = `
-                    <div class="form-group"><label class="form-label">Nome da Receita</label><input type="text" id="i-name" required class="form-control" placeholder="Ex: Salário Fixo"></div>
-                    <div class="form-grid-2">
-                        <div class="form-group"><label class="form-label">Valor Mensal (R$)</label><input type="number" step="0.01" id="i-value" required class="form-control" placeholder="0.00"></div>
-                        <div class="form-group"><label class="form-label">Dia do Recebimento (1-31)</label><input type="number" min="1" max="31" id="i-day" required class="form-control" placeholder="Ex: 5"></div>
-                    </div>`;
-            } else if (type === 'diario') {
-                fields.innerHTML = `
-                    <div class="form-group"><label class="form-label">Descrição do Gasto</label><input type="text" id="d-name" required class="form-control" placeholder="Ex: Uber ou Lanche"></div>
-                    <div class="form-group"><label class="form-label">Valor do Gasto (R$)</label><input type="number" step="0.01" id="d-amount" required class="form-control" placeholder="0.00"></div>`;
-            }
-        }
-
-        window.saveRecord = function(e) {
-            e.preventDefault();
-            const type = state.modalType;
-
-            if (type === 'cartao') {
-                const name = document.getElementById('c-name').value.toUpperCase();
-                const totalBill = parseFloat(document.getElementById('c-bill').value);
-                const dueDay = parseInt(document.getElementById('c-day').value);
-                const prepaid = parseFloat(document.getElementById('c-prepaid').value) || 0;
-                
-                if(state.editingId) {
-                    const idx = state.cards.findIndex(c => c.id === state.editingId);
-                    state.cards[idx] = { id: state.editingId, name, totalBill, dueDay, prepaid };
-                    logToJournal('edicao', `Alteração do cartão ${name}. Fatura: ${formatBRL(totalBill)}.`, 0);
-                } else {
-                    state.cards.push({ id: Date.now().toString(), name, totalBill, dueDay, prepaid });
-                    logToJournal('criacao', `Cartão ${name} cadastrado. Vencimento dia ${dueDay}.`, totalBill);
-                }
-                switchTab('cartoes');
-            } else if (type === 'poupanca') {
-                const name = document.getElementById('s-name').value.toUpperCase();
-                const target = parseFloat(document.getElementById('s-target').value);
-                const saved = parseFloat(document.getElementById('s-saved').value) || 0;
-                const limitDate = document.getElementById('s-date').value;
-
-                if (state.editingId) {
-                    const idx = state.savings.findIndex(s => s.id === state.editingId);
-                    state.savings[idx] = { id: state.editingId, name, target, saved, limitDate };
-                    logToJournal('edicao', `Objetivo ${name} alterado. Alvo: ${formatBRL(target)}.`, 0);
-                } else {
-                    state.savings.push({ id: Date.now().toString(), name, target, saved, limitDate });
-                    logToJournal('criacao', `Objetivo ${name} de poupança cadastrado para ${new Date(limitDate+'T00:00:00').toLocaleDateString('pt-BR')}.`, target);
-                }
-                switchTab('poupancas');
-            } else if (type === 'receita') {
-                const name = document.getElementById('i-name').value.toUpperCase();
-                const value = parseFloat(document.getElementById('i-value').value);
-                const dueDay = parseInt(document.getElementById('i-day').value) || 1;
-
-                if (state.editingId) {
-                    const idx = state.incomes.findIndex(i => i.id === state.editingId);
-                    state.incomes[idx] = { id: state.editingId, name, value, dueDay };
-                    logToJournal('edicao', `Ganho ${name} alterado para ${formatBRL(value)}, Recebimento Dia ${dueDay}.`, value);
-                } else {
-                    state.incomes.push({ id: Date.now().toString(), name, value, dueDay });
-                    logToJournal('criacao', `Nova receita cadastrada: ${name} de ${formatBRL(value)}, Recebimento Dia ${dueDay}.`, value);
-                }
-                switchTab('receitas');
-            } else if (type === 'diario') {
-                const name = document.getElementById('d-name').value.toUpperCase();
-                const amount = parseFloat(document.getElementById('d-amount').value);
-                const dateStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' - ' + new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-
-                state.dailyExpenses.unshift({ id: Date.now().toString(), name, amount, date: dateStr });
-                logToJournal('adiantamento', `Gasto diário registrado em caixa: ${name}.`, -amount);
-                switchTab('diarios');
-            }
-
-            saveState();
-            closeAddModal();
-            renderActiveTab();
-            showToast('Salvo com sucesso!');
-        }
-
-        // --- SISTEMAS DE EDIÇÃO ---
-        window.editCard = function(id) {
-            const c = state.cards.find(item => item.id === id);
-            if (!c) return;
-            openAddModal(); state.editingId = id; setModalType('cartao');
-            document.getElementById('c-name').value = c.name;
-            document.getElementById('c-bill').value = c.totalBill;
-            document.getElementById('c-day').value = c.dueDay;
-            document.getElementById('c-prepaid').value = c.prepaid || 0;
-        }
-
-        window.deleteCard = function(id) {
-            const c = state.cards.find(i => i.id === id);
-            if (c && confirm(`Deseja remover o cartão ${c.name}?`)) {
-                logToJournal('remocao', `Remoção do cartão ${c.name}.`, -c.totalBill);
-                state.cards = state.cards.filter(i => i.id !== id);
-                saveState(); renderActiveTab();
-            }
-        }
-
-        window.editSavings = function(id) {
-            const s = state.savings.find(item => item.id === id);
-            if (!s) return;
-            openAddModal(); state.editingId = id; setModalType('poupanca');
-            document.getElementById('s-name').value = s.name;
-            document.getElementById('s-target').value = s.target;
-            document.getElementById('s-saved').value = s.saved || 0;
-            document.getElementById('s-date').value = s.limitDate;
-        }
-
-        window.deleteSavings = function(id) {
-            const s = state.savings.find(i => i.id === id);
-            if (s && confirm(`Remover o objetivo ${s.name}?`)) {
-                logToJournal('remocao', `Objetivo de poupança removido: ${s.name}.`, -s.target);
-                state.savings = state.savings.filter(i => i.id !== id);
-                saveState(); renderActiveTab();
-            }
-        }
-
-        window.quickAddSavings = function(id) {
-            const amountStr = prompt("Quanto deseja poupar e adicionar agora?");
-            const amount = parseFloat(amountStr) || 0;
-            if (amount <= 0) return;
-
-            const idx = state.savings.findIndex(s => s.id === id);
-            if (idx !== -1) {
-                state.savings[idx].saved = (parseFloat(state.savings[idx].saved) || 0) + amount;
-                logToJournal('adiantamento', `Depósito de poupança adicionado ao objetivo ${state.savings[idx].name}.`, amount);
-                saveState(); renderActiveTab();
-                showToast("Poupança adicionada com sucesso!");
-            }
-        }
-
-        window.editIncome = function(id) {
-            const i = state.incomes.find(item => item.id === id);
-            if (!i) return;
-            openAddModal(); state.editingId = id; setModalType('receita');
-            document.getElementById('i-name').value = i.name;
-            document.getElementById('i-value').value = i.value;
-            document.getElementById('i-day').value = i.dueDay || 5;
-        }
-
-        window.deleteIncome = function(id) {
-            const i = state.incomes.find(item => item.id === id);
-            if (i && confirm(`Remover receita de ${i.name}?`)) {
-                logToJournal('remocao', `Receita removida: ${i.name}.`, -i.value);
-                state.incomes = state.incomes.filter(item => item.id !== id);
-                saveState(); renderActiveTab();
-            }
-        }
-
-        window.deleteDailyExpense = function(id) {
-            const e = state.dailyExpenses.find(item => item.id === id);
-            if (e && confirm(`Remover Gasto Diário de ${e.name}?`)) {
-                logToJournal('remocao', `Gasto Diário removido: ${e.name}.`, e.amount);
-                state.dailyExpenses = state.dailyExpenses.filter(item => item.id !== id);
-                saveState(); renderActiveTab();
-            }
-        }
-
-        // --- SISTEMA DE MODAL DE ADIANTAMENTO RÁPIDO (DÉBITO/PIX) ---
-        window.openPayModal = function(id, name) {
-            const c = state.cards.find(item => item.id === id);
-            if (!c) return;
-            document.getElementById('pay-card-id').value = id;
-            document.getElementById('pay-card-label').textContent = `Adiantar Cartão: ${name} (Fatura Atual: ${formatBRL(c.totalBill)})`;
-            document.getElementById('pay-amount').value = '';
-            document.getElementById('pay-modal').classList.add('open');
-        }
-
-        window.closePayModal = function() { document.getElementById('pay-modal').classList.remove('open'); }
-        window.handlePayOverlayClick = function(e) { if (e.target.id === 'pay-modal') closePayModal(); }
-
-        window.submitPayment = function(e) {
-            e.preventDefault();
-            const id = document.getElementById('pay-card-id').value;
-            const amount = parseFloat(document.getElementById('pay-amount').value) || 0;
-
-            const idx = state.cards.findIndex(c => c.id === id);
-            if (idx !== -1) {
-                const currentPrepaid = parseFloat(state.cards[idx].prepaid || 0);
-                state.cards[idx].prepaid = currentPrepaid + amount;
-                logToJournal('adiantamento', `Adiantamento via Débito/Pix efetuado no cartão ${state.cards[idx].name}.`, amount);
-                saveState();
-                closePayModal();
-                showToast(`Pago ${formatBRL(amount)} no débito!`);
-                renderActiveTab();
-            }
-        }
-
-        window.onload = function() {
-            const realToday = getRealTodayString();
-            simulatedTodayStr = realToday;
-            localStorage.setItem('simulated_today', realToday);
-            updateSimulatedToday(realToday);
-        };
-    </script>
-</body>
-</html>
+            } else if (type === '
