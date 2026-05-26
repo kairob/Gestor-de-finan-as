@@ -819,6 +819,7 @@
             saveState();
         }
 
+        // Conversão de moeda formatada BRL
         function formatBRL(val) {
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
         }
@@ -1014,7 +1015,7 @@
                 }
             }
 
-            // O comprometimento agora é calculado de forma dinâmica comparando sua meta com o Ganho Semanal Regressivo Real!
+            // O comprometimento agora é calculated de forma dinâmica comparando sua meta com o Ganho Semanal Regressivo Real!
             const incomeCommitmentPercent = totalWeeklyIncome > 0 ? Math.min(100, Math.round((totalWeeklyMetaWithMargin / totalWeeklyIncome) * 100)) : 0;
 
             return {
@@ -1217,7 +1218,7 @@
                                     <div class="info-cell" style="grid-column: span 1.5;"><span class="info-grid-label">Líquido em Aberto</span><span class="info-grid-value" style="color: #cbd5e1;">${formatBRL(c.myShare)}</span></div>
                                 </div>
                                 <div class="card-actions">
-                                    <span class="meta-base-text">Meta Base: <strong class="meta-base-value">${formatBRL(c.weeklyTarget)}/sem</strong></span>
+                                    <span class="meta-base-text">Meta Base: <strong style="color: var(--primary);">${formatBRL(c.weeklyTarget)}/sem</strong></span>
                                     <div class="action-button-group">
                                         <button onclick="openPayModal('${c.id}', '${c.name}')" class="btn-action pay">Adiantar (Débito)</button>
                                         <button onclick="editCard('${c.id}')" class="btn-action edit">Editar</button>
